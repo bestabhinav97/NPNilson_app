@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16.8-alpine
+    container_name: np_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-np_nilson}
+      POSTGRES_USER: ${POSTGRES_USER:-np_db_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-np_db_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-np_db_user} -d $${POSTGRES_DB:-np_nilson}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    container_name: np_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@npnilsson.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-pgadmin_password}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: np_backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-np_nilson}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-np_db_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-np_db_password}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@npnilsson.se}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-AdminSecurePassword123!}
+      SEED_ADMIN_FIRSTNAME: ${SEED_ADMIN_FIRSTNAME:-NP}
+      SEED_ADMIN_LASTNAME: ${SEED_ADMIN_LASTNAME:-Admin}
+      SESSION_EXPIRATION_HOURS: ${SESSION_EXPIRATION_HOURS:-24}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  pgadmin_data:

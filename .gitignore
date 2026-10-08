@@ -6,6 +6,9 @@ backend/build/
 backend/.gradle/
 backend/out/
 backend/bin/
+backend/node_modules/
+node_modules/
+backend/.kotlin/
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
@@ -19,7 +22,3 @@ backend/bin/
 .cxx
 local.properties
 .env
-backend/build/
-backend/.gradle/
-backend/out/
-backend/bin/

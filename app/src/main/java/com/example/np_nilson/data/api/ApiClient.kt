@@ -7,8 +7,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    // Default base URL for Android Emulator pointing to host localhost
-    private var baseUrl: String = "http://127.0.0.1:8080/"
+    // Default base URL for Android Emulator pointing to host localhost (10.0.2.2)
+    private var baseUrl: String = "http://10.0.2.2:8080/"
 
     fun setBaseUrl(newUrl: String) {
         val formattedUrl = if (newUrl.endsWith("/")) newUrl else "$newUrl/"

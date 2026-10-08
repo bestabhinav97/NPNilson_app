@@ -5,6 +5,7 @@ require('dotenv').config();
 const { initDatabase } = require('./db/database');
 const authController = require('./controllers/authController');
 const adminController = require('./controllers/adminController');
+const authService = require('./services/authService');
 const { requireAuth, requireAdmin } = require('./middleware/authMiddleware');
 
 const app = express();
@@ -26,6 +27,16 @@ app.get('/', (req, res) => {
 app.post('/api/auth/login', authController.login);
 app.get('/api/auth/me', requireAuth, authController.getCurrentUser);
 app.post('/api/auth/logout', requireAuth, authController.logout);
+
+// Stores Route
+app.get('/api/stores', requireAuth, async (req, res) => {
+    try {
+        const stores = await authService.getAllStores();
+        res.json(stores);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Admin Routes
 app.get('/api/admin/users', requireAdmin, adminController.getAllUsers);

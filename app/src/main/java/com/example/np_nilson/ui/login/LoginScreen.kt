@@ -58,12 +58,12 @@ fun LoginScreen(
                     IconButton(onClick = { viewModel.onSettingsClicked() }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Backend Settings",
+                            contentDescription = "Serverinställningar",
                             tint = NpTextSecondary
                         )
                     }
                 }
-                Divider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+                HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
             }
         },
         containerColor = NpBackgroundLight
@@ -89,7 +89,7 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Account Login",
+                        text = "Logga in",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = NpTextPrimary
@@ -122,8 +122,8 @@ fun LoginScreen(
                         value = viewModel.email,
                         onValueChange = { viewModel.onEmailChanged(it) },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Email or Username") },
-                        placeholder = { Text("Email or Username") },
+                        label = { Text("E-postadress") },
+                        placeholder = { Text("test@test.com") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.AlternateEmail,
@@ -166,8 +166,8 @@ fun LoginScreen(
                         value = viewModel.password,
                         onValueChange = { viewModel.onPasswordChanged(it) },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Password") },
-                        placeholder = { Text("Password") },
+                        label = { Text("Lösenord") },
+                        placeholder = { Text("Lösenord") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Key,
@@ -179,7 +179,7 @@ fun LoginScreen(
                             IconButton(onClick = { viewModel.togglePasswordVisibility() }) {
                                 Icon(
                                     imageVector = if (viewModel.isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (viewModel.isPasswordVisible) "Hide password" else "Show password",
+                                    contentDescription = if (viewModel.isPasswordVisible) "Dölj lösenord" else "Visa lösenord",
                                     tint = NpTextSecondary
                                 )
                             }
@@ -235,7 +235,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = "LOG IN",
+                                text = "LOGGA IN",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
@@ -248,10 +248,11 @@ fun LoginScreen(
                     // Contact Administrator link
                     TextButton(onClick = { viewModel.onContactAdminClicked() }) {
                         Text(
-                            text = "Forgot password? Contact your administrator",
+                            text = "Glömt lösenord? Kontakta din administratör",
                             color = NpBluePrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -263,9 +264,9 @@ fun LoginScreen(
     if (viewModel.showContactAdminDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissContactAdminDialog() },
-            title = { Text("Contact Administrator") },
+            title = { Text("Kontakta administratör") },
             text = {
-                Text("Account creation and password resets are managed by your NP Nilsson system administrator. Please contact your IT department or administrator to request access or reset your credentials.")
+                Text("Kontoanläggning och återställning av lösenord hanteras av din systemadministratör på NP Nilsson. Vänligen kontakta IT-avdelningen för hjälp.")
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissContactAdminDialog() }) {
@@ -281,11 +282,11 @@ fun LoginScreen(
 
         AlertDialog(
             onDismissRequest = { viewModel.dismissSettingsDialog() },
-            title = { Text("Backend Server URL") },
+            title = { Text("Serveradress för backend") },
             text = {
                 Column {
                     Text(
-                        text = "Configure backend endpoint URL (e.g. http://10.0.2.2:8080/ for Android Emulator or your PC's IP address for physical device):",
+                        text = "Konfigurera backend-serverns adress (t.ex. http://10.0.2.2:8080/ för Android Emulator eller din dators IP-adress):",
                         fontSize = 13.sp,
                         color = NpTextSecondary
                     )
@@ -293,7 +294,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = tempUrl,
                         onValueChange = { tempUrl = it },
-                        label = { Text("Server Base URL") },
+                        label = { Text("Serveradress") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -301,12 +302,12 @@ fun LoginScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.updateBackendUrl(tempUrl) }) {
-                    Text("Save", color = NpBluePrimary)
+                    Text("Spara", color = NpBluePrimary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissSettingsDialog() }) {
-                    Text("Cancel", color = NpTextSecondary)
+                    Text("Avbryt", color = NpTextSecondary)
                 }
             }
         )

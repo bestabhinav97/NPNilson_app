@@ -3,12 +3,36 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
+function formatUserResponse(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        firstname: row.firstname,
+        lastname: row.lastname,
+        email: row.email,
+        role: row.role,
+        store: row.store_id ? {
+            storeId: parseInt(row.store_id, 10),
+            storeName: row.store_name,
+            address: row.address
+        } : null
+    };
+}
+
 async function login(email, password) {
     if (!email || !password) {
         throw new Error('Email and password are required');
     }
 
-    const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    const result = await pool.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.password_hash, u.role, u.store_id,
+                s.store_name, s.address
+         FROM users u
+         LEFT JOIN stores s ON u.store_id = s.store_id
+         WHERE LOWER(u.email) = LOWER($1)`,
+        [email.trim()]
+    );
+
     if (result.rows.length === 0) {
         throw new Error('Invalid email or password');
     }
@@ -30,13 +54,7 @@ async function login(email, password) {
 
     return {
         token,
-        user: {
-            id: user.id,
-            firstname: user.firstname,
-            lastname: user.lastname,
-            email: user.email,
-            role: user.role
-        }
+        user: formatUserResponse(user)
     };
 }
 
@@ -44,15 +62,17 @@ async function getUserByToken(token) {
     if (!token) return null;
 
     const result = await pool.query(
-        `SELECT u.id, u.firstname, u.lastname, u.email, u.role
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
+                s.store_name, s.address
          FROM user_sessions s
          JOIN users u ON s.user_id = u.id
+         LEFT JOIN stores s ON u.store_id = s.store_id
          WHERE s.token = $1 AND s.revoked = false AND s.expires_at > CURRENT_TIMESTAMP`,
         [token]
     );
 
     if (result.rows.length === 0) return null;
-    return result.rows[0];
+    return formatUserResponse(result.rows[0]);
 }
 
 async function logout(token) {
@@ -61,12 +81,20 @@ async function logout(token) {
 }
 
 async function getAllUsers() {
-    const result = await pool.query('SELECT id, firstname, lastname, email, role FROM users ORDER BY created_at DESC');
-    return result.rows;
+    const result = await pool.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
+                s.store_name, s.address
+         FROM users u
+         LEFT JOIN stores s ON u.store_id = s.store_id
+         ORDER BY u.created_at DESC`
+    );
+    return result.rows.map(formatUserResponse);
 }
 
 async function createUser(data) {
-    const { firstname, lastname, email, password, role = 'USER' } = data;
+    const { firstname, lastname, email, password, role = 'USER', storeId = null, store_id = null } = data;
+    const targetStoreId = storeId || store_id || (role === 'USER' ? 1 : null);
+
     if (!firstname || !lastname || !email || !password) {
         throw new Error('All user fields are required');
     }
@@ -80,17 +108,20 @@ async function createUser(data) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     await pool.query(
-        'INSERT INTO users (id, firstname, lastname, email, password_hash, role) VALUES ($1, $2, $3, $4, $5, $6)',
-        [userId, firstname, lastname, email.trim(), passwordHash, role]
+        'INSERT INTO users (id, firstname, lastname, email, password_hash, role, store_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [userId, firstname, lastname, email.trim(), passwordHash, role, targetStoreId]
     );
 
-    return {
-        id: userId,
-        firstname,
-        lastname,
-        email: email.trim(),
-        role
-    };
+    const userResult = await pool.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
+                s.store_name, s.address
+         FROM users u
+         LEFT JOIN stores s ON u.store_id = s.store_id
+         WHERE u.id = $1`,
+        [userId]
+    );
+
+    return formatUserResponse(userResult.rows[0]);
 }
 
 async function resetPassword(userId, newPassword) {
@@ -99,16 +130,30 @@ async function resetPassword(userId, newPassword) {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    const result = await pool.query(
-        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, firstname, lastname, email, role',
+    await pool.query(
+        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [passwordHash, userId]
+    );
+
+    const result = await pool.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
+                s.store_name, s.address
+         FROM users u
+         LEFT JOIN stores s ON u.store_id = s.store_id
+         WHERE u.id = $1`,
+        [userId]
     );
 
     if (result.rows.length === 0) {
         throw new Error('User not found');
     }
 
-    return result.rows[0];
+    return formatUserResponse(result.rows[0]);
+}
+
+async function getAllStores() {
+    const result = await pool.query('SELECT store_id as "storeId", store_name as "storeName", address FROM stores ORDER BY store_id ASC');
+    return result.rows;
 }
 
 module.exports = {
@@ -117,5 +162,6 @@ module.exports = {
     logout,
     getAllUsers,
     createUser,
-    resetPassword
+    resetPassword,
+    getAllStores
 };

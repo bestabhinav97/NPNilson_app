@@ -86,15 +86,15 @@ class LoginViewModel : ViewModel() {
         // Validation
         var hasError = false
         if (email.isBlank()) {
-            emailError = "Email is required"
+            emailError = "E-postadress krävs"
             hasError = true
         } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-            emailError = "Please enter a valid email address"
+            emailError = "Ange en giltig e-postadress"
             hasError = true
         }
 
         if (password.isBlank()) {
-            passwordError = "Password is required"
+            passwordError = "Lösenord krävs"
             hasError = true
         }
 
@@ -118,11 +118,11 @@ class LoginViewModel : ViewModel() {
                     } catch (e: Exception) {
                         null
                     }
-                    errorMessage = parsedError ?: "Invalid email or password"
+                    errorMessage = parsedError ?: "Felaktig e-postadress eller lösenord"
                 }
             } catch (e: Exception) {
                 isLoading = false
-                errorMessage = "Unable to connect to server. Check your network or backend URL."
+                errorMessage = "Kan inte ansluta till servern. Kontrollera din anslutning eller serveradress."
             }
         }
     }

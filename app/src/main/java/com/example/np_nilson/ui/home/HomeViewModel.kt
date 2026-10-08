@@ -50,8 +50,26 @@ class HomeViewModel : ViewModel() {
 
     fun initSession(sessionManager: SessionManager) {
         currentUser = sessionManager.getUser()
-        if (currentUser?.role == "ADMIN") {
-            loadUsers(sessionManager)
+        refreshCurrentUser(sessionManager)
+    }
+
+    fun refreshCurrentUser(sessionManager: SessionManager) {
+        val token = sessionManager.getToken() ?: return
+        viewModelScope.launch {
+            try {
+                val response = ApiClient.getAuthApi().getCurrentUser("Bearer $token")
+                if (response.isSuccessful && response.body() != null) {
+                    val updatedUser = response.body()!!
+                    currentUser = updatedUser
+                    sessionManager.saveSession(token, updatedUser)
+                }
+            } catch (e: Exception) {
+                // Ignore network error on silent refresh, fallback to cached session user
+            }
+
+            if (currentUser?.role == "ADMIN") {
+                loadUsers(sessionManager)
+            }
         }
     }
 

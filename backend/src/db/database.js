@@ -88,6 +88,44 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
         `);
 
+        // Create reports table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS reports (
+                id UUID PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                store_id BIGINT REFERENCES stores(store_id) ON DELETE SET NULL,
+                category VARCHAR(30) NOT NULL CHECK (category IN ('DAMAGED_GOODS', 'SAFETY', 'MAINTENANCE', 'OTHER')),
+                title VARCHAR(150) NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED')),
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_reports_user_id ON reports(user_id);
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_reports_store_id ON reports(store_id);
+        `);
+
+        // Create report images table (files are stored on disk in UPLOAD_DIR)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS report_images (
+                id UUID PRIMARY KEY,
+                report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+                file_name VARCHAR(255) NOT NULL,
+                content_type VARCHAR(100) NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_report_images_report_id ON report_images(report_id);
+        `);
+
         // Seed admin users
         const adminEmail1 = process.env.SEED_ADMIN_EMAIL || 'admin@npnilsson.se';
         const adminEmail2 = 'admin@admin.com';

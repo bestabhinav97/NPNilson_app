@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Description
@@ -38,16 +39,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.np_nilson.data.api.ReportCategory
 import com.example.np_nilson.data.api.UserDto
 import com.example.np_nilson.data.session.SessionManager
 import com.example.np_nilson.ui.branding.NpNilssonHeaderLogo
+import com.example.np_nilson.ui.report.ReportDetailDialog
+import com.example.np_nilson.ui.report.ReportListItem
 import com.example.np_nilson.ui.theme.*
+
+private const val RECENT_REPORTS_COUNT = 3
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     sessionManager: SessionManager,
     onLoggedOut: () -> Unit,
+    onCreateReport: (ReportCategory?) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     LaunchedEffect(Unit) {
@@ -162,10 +169,15 @@ fun HomeScreen(
                 0 -> HomeTabContent(
                     user = user,
                     viewModel = viewModel,
+                    token = sessionManager.getToken(),
+                    onCreateReport = onCreateReport,
+                    onShowAllReports = { selectedTab = 1 },
                     onActionClicked = { action -> showPlaceholderSnackbar = "$action (kommer i nästa fas)" }
                 )
                 1 -> ReportsTabContent(
-                    user = user
+                    user = user,
+                    viewModel = viewModel,
+                    sessionManager = sessionManager
                 )
                 2 -> ProfileTabContent(
                     user = user,
@@ -213,6 +225,19 @@ fun HomeScreen(
                     Text("Stäng")
                 }
             }
+        )
+    }
+
+    // Report Detail
+    viewModel.selectedReport?.let { report ->
+        ReportDetailDialog(
+            report = report,
+            token = sessionManager.getToken(),
+            canChangeStatus = user?.role == "ADMIN",
+            isUpdatingStatus = viewModel.isUpdatingReportStatus,
+            statusError = viewModel.reportStatusError,
+            onChangeStatus = { status -> viewModel.updateReportStatus(sessionManager, report, status) },
+            onDismiss = { viewModel.closeReport() }
         )
     }
 
@@ -321,6 +346,9 @@ fun HomeScreen(
 fun HomeTabContent(
     user: UserDto?,
     viewModel: HomeViewModel,
+    token: String?,
+    onCreateReport: (ReportCategory?) -> Unit,
+    onShowAllReports: () -> Unit,
     onActionClicked: (String) -> Unit
 ) {
     LazyColumn(
@@ -380,7 +408,7 @@ fun HomeTabContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(4.dp, RoundedCornerShape(16.dp))
-                    .clickable { onActionClicked("Skapa ny rapport") },
+                    .clickable { onCreateReport(null) },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = NpBluePrimary)
             ) {
@@ -462,14 +490,14 @@ fun HomeTabContent(
                             subtitle = "Rapportera trasiga eller skadade varor.",
                             icon = Icons.Outlined.Inventory2,
                             modifier = Modifier.weight(1f),
-                            onClick = { onActionClicked("Skadat gods") }
+                            onClick = { onCreateReport(ReportCategory.DAMAGED_GOODS) }
                         )
                         ReportCategoryCard(
                             title = "Säkerhet",
                             subtitle = "Risker, tillbud eller säkerhetsproblem.",
                             icon = Icons.Outlined.Warning,
                             modifier = Modifier.weight(1f),
-                            onClick = { onActionClicked("Säkerhet") }
+                            onClick = { onCreateReport(ReportCategory.SAFETY) }
                         )
                     }
 
@@ -482,14 +510,14 @@ fun HomeTabContent(
                             subtitle = "Fel, reparationer eller underhållsbehov.",
                             icon = Icons.Outlined.Build,
                             modifier = Modifier.weight(1f),
-                            onClick = { onActionClicked("Underhåll") }
+                            onClick = { onCreateReport(ReportCategory.MAINTENANCE) }
                         )
                         ReportCategoryCard(
                             title = "Övrigt",
                             subtitle = "Andra avvikelser eller förbättringsförslag.",
                             icon = Icons.Default.MoreHoriz,
                             modifier = Modifier.weight(1f),
-                            onClick = { onActionClicked("Övrigt") }
+                            onClick = { onCreateReport(ReportCategory.OTHER) }
                         )
                     }
                 }
@@ -516,57 +544,70 @@ fun HomeTabContent(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NpBluePrimary,
-                        modifier = Modifier.clickable { onActionClicked("Visa alla rapporter") }
+                        modifier = Modifier.clickable { onShowAllReports() }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Empty State Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFF1F5F9)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Description,
-                                contentDescription = null,
-                                tint = NpTextSecondary,
-                                modifier = Modifier.size(24.dp)
+                if (viewModel.reports.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        viewModel.reports.take(RECENT_REPORTS_COUNT).forEach { report ->
+                            ReportListItem(
+                                report = report,
+                                token = token,
+                                showAuthor = user?.role == "ADMIN",
+                                onClick = { viewModel.openReport(report) }
                             )
                         }
+                    }
+                } else {
+                    // Empty State Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFF1F5F9)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Description,
+                                    contentDescription = null,
+                                    tint = NpTextSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                        Text(
-                            text = "Inga rapporter ännu.",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NpTextPrimary
-                        )
+                            Text(
+                                text = "Inga rapporter ännu.",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NpTextPrimary
+                            )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
-                        Text(
-                            text = "Dina rapporter visas här när de har skapats.",
-                            fontSize = 13.sp,
-                            color = NpTextSecondary,
-                            textAlign = TextAlign.Center
-                        )
+                            Text(
+                                text = "Dina rapporter visas här när de har skapats.",
+                                fontSize = 13.sp,
+                                color = NpTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -743,43 +784,93 @@ fun ReportCategoryCard(
 
 @Composable
 fun ReportsTabContent(
-    user: UserDto?
+    user: UserDto?,
+    viewModel: HomeViewModel,
+    sessionManager: SessionManager
 ) {
-    Column(
+    val isAdmin = user?.role == "ADMIN"
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Description,
-            contentDescription = null,
-            tint = NpBluePrimary,
-            modifier = Modifier.size(64.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Mina rapporter",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = NpTextPrimary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Butik: ${user?.store?.storeName ?: "Alla butiker"}",
-            fontSize = 14.sp,
-            color = NpBluePrimary,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Inga inskickade rapporter hittades. Fullständig rapporthantering aktiveras i nästa fas.",
-            fontSize = 13.sp,
-            color = NpTextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 24.dp)
-        )
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isAdmin) "Alla rapporter" else "Mina rapporter",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NpTextPrimary
+                    )
+                    Text(
+                        text = "Butik: ${user?.store?.storeName ?: "Alla butiker"}",
+                        fontSize = 14.sp,
+                        color = NpBluePrimary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                if (viewModel.isLoadingReports) {
+                    CircularProgressIndicator(
+                        color = NpBluePrimary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .size(24.dp)
+                    )
+                } else {
+                    IconButton(onClick = { viewModel.loadReports(sessionManager) }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Uppdatera", tint = NpBluePrimary)
+                    }
+                }
+            }
+        }
+
+        viewModel.reportsError?.let { error ->
+            item {
+                Text(text = error, color = NpErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+
+        if (viewModel.reports.isEmpty() && !viewModel.isLoadingReports && viewModel.reportsError == null) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = null,
+                        tint = NpBluePrimary,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Inga inskickade rapporter hittades.",
+                        fontSize = 14.sp,
+                        color = NpTextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        items(viewModel.reports, key = { it.id }) { report ->
+            ReportListItem(
+                report = report,
+                token = sessionManager.getToken(),
+                showAuthor = isAdmin,
+                onClick = { viewModel.openReport(report) }
+            )
+        }
     }
 }
 

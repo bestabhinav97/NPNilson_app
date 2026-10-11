@@ -64,10 +64,10 @@ async function getUserByToken(token) {
     const result = await pool.query(
         `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
                 s.store_name, s.address
-         FROM user_sessions s
-         JOIN users u ON s.user_id = u.id
+         FROM user_sessions us
+         JOIN users u ON us.user_id = u.id
          LEFT JOIN stores s ON u.store_id = s.store_id
-         WHERE s.token = $1 AND s.revoked = false AND s.expires_at > CURRENT_TIMESTAMP`,
+         WHERE us.token = $1 AND us.revoked = false AND us.expires_at > CURRENT_TIMESTAMP`,
         [token]
     );
 

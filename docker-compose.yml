@@ -48,6 +48,9 @@ services:
       SEED_ADMIN_FIRSTNAME: ${SEED_ADMIN_FIRSTNAME:-NP}
       SEED_ADMIN_LASTNAME: ${SEED_ADMIN_LASTNAME:-Admin}
       SESSION_EXPIRATION_HOURS: ${SESSION_EXPIRATION_HOURS:-24}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - report_uploads:/app/uploads
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
@@ -62,3 +65,4 @@ services:
 volumes:
   postgres_data:
   pgadmin_data:
+  report_uploads:

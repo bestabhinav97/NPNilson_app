@@ -22,3 +22,4 @@ backend/.kotlin/
 .cxx
 local.properties
 .env
+uploads/

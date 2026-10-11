@@ -5,6 +5,7 @@ require('dotenv').config();
 const { initDatabase } = require('./db/database');
 const authController = require('./controllers/authController');
 const adminController = require('./controllers/adminController');
+const reportController = require('./controllers/reportController');
 const authService = require('./services/authService');
 const { requireAuth, requireAdmin } = require('./middleware/authMiddleware');
 
@@ -37,6 +38,12 @@ app.get('/api/stores', requireAuth, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Report Routes
+app.post('/api/reports', requireAuth, reportController.uploadImages, reportController.createReport);
+app.get('/api/reports', requireAuth, reportController.getReports);
+app.patch('/api/reports/:reportId/status', requireAdmin, reportController.updateReportStatus);
+app.get('/api/reports/:reportId/images/:imageId', requireAuth, reportController.getReportImage);
 
 // Admin Routes
 app.get('/api/admin/users', requireAdmin, adminController.getAllUsers);

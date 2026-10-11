@@ -14,6 +14,7 @@ object ApiClient {
         val formattedUrl = if (newUrl.endsWith("/")) newUrl else "$newUrl/"
         baseUrl = formattedUrl
         authApiInstance = createAuthApi()
+        reportsApiInstance = createReportsApi()
     }
 
     fun getBaseUrl(): String = baseUrl
@@ -22,8 +23,11 @@ object ApiClient {
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
+            // Report uploads can contain several photos
+            .writeTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                // HEADERS instead of BODY so multipart photo uploads aren't dumped to logcat
+                level = HttpLoggingInterceptor.Level.HEADERS
             })
             .build()
     }
@@ -32,12 +36,19 @@ object ApiClient {
 
     fun getAuthApi(): AuthApi = authApiInstance
 
-    private fun createAuthApi(): AuthApi {
+    private var reportsApiInstance: ReportsApi = createReportsApi()
+
+    fun getReportsApi(): ReportsApi = reportsApiInstance
+
+    private fun createAuthApi(): AuthApi = createRetrofit().create(AuthApi::class.java)
+
+    private fun createReportsApi(): ReportsApi = createRetrofit().create(ReportsApi::class.java)
+
+    private fun createRetrofit(): Retrofit {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(AuthApi::class.java)
     }
 }

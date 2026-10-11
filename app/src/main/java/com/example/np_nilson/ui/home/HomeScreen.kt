@@ -628,35 +628,31 @@ fun HomeTabContent(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = NpBluePrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Användaradministration",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NpTextPrimary
-                                )
-                            }
+                        // Title and button are stacked: side by side they don't fit on narrow phones
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = NpBluePrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Användaradministration",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NpTextPrimary
+                            )
+                        }
 
-                            Button(
-                                onClick = { viewModel.openCreateUserDialog() },
-                                colors = ButtonDefaults.buttonColors(containerColor = NpBluePrimary),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Skapa användare", fontSize = 12.sp)
-                            }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { viewModel.openCreateUserDialog() },
+                            colors = ButtonDefaults.buttonColors(containerColor = NpBluePrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Skapa användare", fontSize = 12.sp)
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))

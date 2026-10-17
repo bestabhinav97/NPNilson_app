@@ -48,7 +48,13 @@ app.get('/api/reports/:reportId/images/:imageId', requireAuth, reportController.
 // Admin Routes
 app.get('/api/admin/users', requireAdmin, adminController.getAllUsers);
 app.post('/api/admin/users', requireAdmin, adminController.createUser);
+app.put('/api/admin/users/:userId', requireAdmin, adminController.updateUser);
+app.delete('/api/admin/users/:userId', requireAdmin, adminController.deleteUser);
 app.post('/api/admin/users/:userId/reset-password', requireAdmin, adminController.resetPassword);
+
+app.post('/api/admin/stores', requireAdmin, adminController.createStore);
+app.put('/api/admin/stores/:storeId', requireAdmin, adminController.updateStore);
+app.delete('/api/admin/stores/:storeId', requireAdmin, adminController.deleteStore);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

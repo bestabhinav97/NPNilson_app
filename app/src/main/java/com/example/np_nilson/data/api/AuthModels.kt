@@ -40,6 +40,24 @@ data class ResetPasswordRequest(
     @SerializedName("newPassword") val newPassword: String
 )
 
+data class UpdateUserRequest(
+    @SerializedName("firstname") val firstname: String,
+    @SerializedName("lastname") val lastname: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("role") val role: String,
+    @SerializedName("storeId") val storeId: Long? = null
+)
+
+data class CreateStoreRequest(
+    @SerializedName("storeName") val storeName: String,
+    @SerializedName("address") val address: String
+)
+
+data class UpdateStoreRequest(
+    @SerializedName("storeName") val storeName: String,
+    @SerializedName("address") val address: String
+)
+
 data class ApiResponse(
     @SerializedName("message") val message: String
 )

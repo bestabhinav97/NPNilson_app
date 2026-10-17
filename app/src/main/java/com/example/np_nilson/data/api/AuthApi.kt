@@ -36,4 +36,41 @@ interface AuthApi {
         @Path("userId") userId: String,
         @Body request: ResetPasswordRequest
     ): Response<UserDto>
+
+    @PUT("api/admin/users/{userId}")
+    suspend fun updateUser(
+        @Header("Authorization") authHeader: String,
+        @Path("userId") userId: String,
+        @Body request: UpdateUserRequest
+    ): Response<UserDto>
+
+    @DELETE("api/admin/users/{userId}")
+    suspend fun deleteUser(
+        @Header("Authorization") authHeader: String,
+        @Path("userId") userId: String
+    ): Response<ApiResponse>
+
+    @POST("api/admin/stores")
+    suspend fun createStore(
+        @Header("Authorization") authHeader: String,
+        @Body request: CreateStoreRequest
+    ): Response<StoreDto>
+
+    @PUT("api/admin/stores/{storeId}")
+    suspend fun updateStore(
+        @Header("Authorization") authHeader: String,
+        @Path("storeId") storeId: Long,
+        @Body request: UpdateStoreRequest
+    ): Response<StoreDto>
+
+    @DELETE("api/admin/stores/{storeId}")
+    suspend fun deleteStore(
+        @Header("Authorization") authHeader: String,
+        @Path("storeId") storeId: Long
+    ): Response<ApiResponse>
+
+    @GET("api/stores")
+    suspend fun getStores(
+        @Header("Authorization") authHeader: String
+    ): Response<List<StoreDto>>
 }

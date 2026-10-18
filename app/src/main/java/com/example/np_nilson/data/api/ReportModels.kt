@@ -17,11 +17,22 @@ data class UpdateReportStatusRequest(
     @SerializedName("status") val status: String
 )
 
+/** Camera metadata the server read from the photo's EXIF. Every field is null when the photo had none. */
+data class ReportImageMetadataDto(
+    @SerializedName("takenAt") val takenAt: String? = null,
+    @SerializedName("latitude") val latitude: Double? = null,
+    @SerializedName("longitude") val longitude: Double? = null,
+    @SerializedName("altitude") val altitude: Double? = null,
+    @SerializedName("cameraMake") val cameraMake: String? = null,
+    @SerializedName("cameraModel") val cameraModel: String? = null
+)
+
 data class ReportImageDto(
     @SerializedName("id") val id: String,
     @SerializedName("url") val url: String,
     @SerializedName("contentType") val contentType: String,
-    @SerializedName("sizeBytes") val sizeBytes: Long
+    @SerializedName("sizeBytes") val sizeBytes: Long,
+    @SerializedName("metadata") val metadata: ReportImageMetadataDto? = null
 )
 
 data class ReportAuthorDto(

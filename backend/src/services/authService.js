@@ -151,9 +151,105 @@ async function resetPassword(userId, newPassword) {
     return formatUserResponse(result.rows[0]);
 }
 
+async function updateUser(userId, data) {
+    const { firstname, lastname, email, role, storeId = null, store_id = null } = data;
+    const targetStoreId = storeId || store_id || null;
+
+    if (!firstname || !lastname || !email || !role) {
+        throw new Error('First name, last name, email, and role are required');
+    }
+
+    // Check email conflict with another user
+    const existing = await pool.query(
+        'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2',
+        [email.trim(), userId]
+    );
+    if (existing.rows.length > 0) {
+        throw new Error('Another user with this email already exists');
+    }
+
+    await pool.query(
+        `UPDATE users
+         SET firstname = $1, lastname = $2, email = $3, role = $4, store_id = $5, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6`,
+        [firstname, lastname, email.trim(), role, targetStoreId, userId]
+    );
+
+    const result = await pool.query(
+        `SELECT u.id, u.firstname, u.lastname, u.email, u.role, u.store_id,
+                s.store_name, s.address
+         FROM users u
+         LEFT JOIN stores s ON u.store_id = s.store_id
+         WHERE u.id = $1`,
+        [userId]
+    );
+
+    if (result.rows.length === 0) {
+        throw new Error('User not found');
+    }
+
+    return formatUserResponse(result.rows[0]);
+}
+
+async function deleteUser(userId, requesterId) {
+    if (userId === requesterId) {
+        throw new Error('You cannot delete your own account');
+    }
+
+    const check = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (check.rows.length === 0) {
+        throw new Error('User not found');
+    }
+
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    return { success: true, message: 'User deleted successfully' };
+}
+
 async function getAllStores() {
     const result = await pool.query('SELECT store_id as "storeId", store_name as "storeName", address FROM stores ORDER BY store_id ASC');
     return result.rows;
+}
+
+async function createStore(data) {
+    const { storeName, address } = data;
+    if (!storeName || !address) {
+        throw new Error('Store name and address are required');
+    }
+
+    const result = await pool.query(
+        'INSERT INTO stores (store_name, address) VALUES ($1, $2) RETURNING store_id as "storeId", store_name as "storeName", address',
+        [storeName.trim(), address.trim()]
+    );
+
+    return result.rows[0];
+}
+
+async function updateStore(storeId, data) {
+    const { storeName, address } = data;
+    if (!storeName || !address) {
+        throw new Error('Store name and address are required');
+    }
+
+    const result = await pool.query(
+        'UPDATE stores SET store_name = $1, address = $2 WHERE store_id = $3 RETURNING store_id as "storeId", store_name as "storeName", address',
+        [storeName.trim(), address.trim(), storeId]
+    );
+
+    if (result.rows.length === 0) {
+        throw new Error('Store not found');
+    }
+
+    return result.rows[0];
+}
+
+async function deleteStore(storeId) {
+    const check = await pool.query('SELECT store_id FROM stores WHERE store_id = $1', [storeId]);
+    if (check.rows.length === 0) {
+        throw new Error('Store not found');
+    }
+
+    await pool.query('DELETE FROM stores WHERE store_id = $1', [storeId]);
+    return { success: true, message: 'Store deleted successfully' };
 }
 
 module.exports = {
@@ -162,6 +258,11 @@ module.exports = {
     logout,
     getAllUsers,
     createUser,
+    updateUser,
+    deleteUser,
     resetPassword,
-    getAllStores
+    getAllStores,
+    createStore,
+    updateStore,
+    deleteStore
 };

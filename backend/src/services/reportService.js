@@ -2,6 +2,7 @@ const { pool } = require('../db/database');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
+const { PHOTO_TIME_ZONE, readPhotoMetadata } = require('./photoMetadata');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads');
 const CATEGORIES = ['DAMAGED_GOODS', 'SAFETY', 'MAINTENANCE', 'OTHER'];
@@ -29,7 +30,15 @@ function formatReportResponse(row, images) {
             id: img.id,
             url: `/api/reports/${row.id}/images/${img.id}`,
             contentType: img.content_type,
-            sizeBytes: img.size_bytes
+            sizeBytes: img.size_bytes,
+            metadata: {
+                takenAt: img.taken_at,
+                latitude: img.latitude,
+                longitude: img.longitude,
+                altitude: img.altitude,
+                cameraMake: img.camera_make,
+                cameraModel: img.camera_model
+            }
         }))
     };
 }
@@ -60,6 +69,7 @@ async function createReport(user, data, files) {
 
     const reportId = uuidv4();
     const storeId = user.store ? user.store.storeId : null;
+    const metadata = await Promise.all((files || []).map(file => readPhotoMetadata(file.path)));
     const client = await pool.connect();
 
     try {
@@ -69,10 +79,22 @@ async function createReport(user, data, files) {
             [reportId, user.id, storeId, category, title.trim(), description.trim()]
         );
 
-        for (const file of files || []) {
+        for (const [index, file] of (files || []).entries()) {
+            const meta = metadata[index];
+            // taken_at uses the photo's own offset, or PHOTO_TIME_ZONE when the camera didn't record one
             await client.query(
-                'INSERT INTO report_images (id, report_id, file_name, content_type, size_bytes) VALUES ($1, $2, $3, $4, $5)',
-                [path.parse(file.filename).name, reportId, file.filename, file.mimetype, file.size]
+                `INSERT INTO report_images
+                    (id, report_id, file_name, content_type, size_bytes,
+                     taken_at, latitude, longitude, altitude, camera_make, camera_model, exif)
+                 VALUES ($1, $2, $3, $4, $5,
+                     COALESCE(($6::text || $7::text)::timestamptz, $6::timestamp AT TIME ZONE $8::text),
+                     $9, $10, $11, $12, $13, $14)`,
+                [
+                    path.parse(file.filename).name, reportId, file.filename, file.mimetype, file.size,
+                    meta.takenAtLocal, meta.takenAtOffset, PHOTO_TIME_ZONE,
+                    meta.latitude, meta.longitude, meta.altitude, meta.cameraMake, meta.cameraModel,
+                    meta.exif ? JSON.stringify(meta.exif) : null
+                ]
             );
         }
 

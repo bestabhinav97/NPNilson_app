@@ -126,6 +126,18 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_report_images_report_id ON report_images(report_id);
         `);
 
+        // Camera metadata read from the photo's EXIF when it is uploaded
+        await client.query(`
+            ALTER TABLE report_images
+                ADD COLUMN IF NOT EXISTS taken_at TIMESTAMP WITH TIME ZONE,
+                ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+                ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+                ADD COLUMN IF NOT EXISTS altitude DOUBLE PRECISION,
+                ADD COLUMN IF NOT EXISTS camera_make VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS camera_model VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS exif JSONB;
+        `);
+
         // Seed admin users
         const adminEmail1 = process.env.SEED_ADMIN_EMAIL || 'admin@npnilsson.se';
         const adminEmail2 = 'admin@admin.com';

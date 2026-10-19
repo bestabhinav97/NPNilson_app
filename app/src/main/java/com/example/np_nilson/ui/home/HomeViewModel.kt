@@ -327,20 +327,24 @@ class HomeViewModel : ViewModel() {
                 )
                 val response = ApiClient.getAuthApi().updateUser("Bearer $token", user.id, request)
                 isLoading = false
-                if (response.isSuccessful) {
+                if (response.isSuccessful && response.body() != null) {
+                    val updatedUser = response.body()!!
                     showEditUserDialog = false
-                    statusMessage = "Uppdaterade användaren ${editEmail.trim()}"
+                    statusMessage = "Uppdaterade användaren ${updatedUser.email}"
                     isErrorStatus = false
                     loadUsers(sessionManager)
+                    if (currentUser?.id == user.id) {
+                        currentUser = updatedUser
+                    }
                 } else {
                     val errorStr = response.errorBody()?.string()
                     val parsed = try { Gson().fromJson(errorStr, ErrorResponse::class.java)?.error } catch (e: Exception) { null }
-                    statusMessage = parsed ?: "Kunde inte uppdatera användare"
+                    statusMessage = parsed ?: errorStr?.takeIf { it.isNotBlank() } ?: "Kunde inte uppdatera användare"
                     isErrorStatus = true
                 }
             } catch (e: Exception) {
                 isLoading = false
-                statusMessage = "Kunde inte ansluta till servern"
+                statusMessage = "Kunde inte ansluta till servern: ${e.localizedMessage}"
                 isErrorStatus = true
             }
         }

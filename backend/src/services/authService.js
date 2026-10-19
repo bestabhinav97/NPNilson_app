@@ -131,7 +131,7 @@ async function resetPassword(userId, newPassword) {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await pool.query(
-        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2::uuid',
         [passwordHash, userId]
     );
 
@@ -140,7 +140,7 @@ async function resetPassword(userId, newPassword) {
                 s.store_name, s.address
          FROM users u
          LEFT JOIN stores s ON u.store_id = s.store_id
-         WHERE u.id = $1`,
+         WHERE u.id = $1::uuid`,
         [userId]
     );
 
@@ -152,8 +152,8 @@ async function resetPassword(userId, newPassword) {
 }
 
 async function updateUser(userId, data) {
-    const { firstname, lastname, email, role, storeId = null, store_id = null } = data;
-    const targetStoreId = storeId || store_id || null;
+    const { firstname, lastname, email, role, storeId, store_id } = data;
+    const targetStoreId = storeId !== undefined ? storeId : (store_id !== undefined ? store_id : null);
 
     if (!firstname || !lastname || !email || !role) {
         throw new Error('First name, last name, email, and role are required');
@@ -161,7 +161,7 @@ async function updateUser(userId, data) {
 
     // Check email conflict with another user
     const existing = await pool.query(
-        'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2',
+        'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2::uuid',
         [email.trim(), userId]
     );
     if (existing.rows.length > 0) {
@@ -171,7 +171,7 @@ async function updateUser(userId, data) {
     await pool.query(
         `UPDATE users
          SET firstname = $1, lastname = $2, email = $3, role = $4, store_id = $5, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $6`,
+         WHERE id = $6::uuid`,
         [firstname, lastname, email.trim(), role, targetStoreId, userId]
     );
 
@@ -180,7 +180,7 @@ async function updateUser(userId, data) {
                 s.store_name, s.address
          FROM users u
          LEFT JOIN stores s ON u.store_id = s.store_id
-         WHERE u.id = $1`,
+         WHERE u.id = $1::uuid`,
         [userId]
     );
 
@@ -196,12 +196,12 @@ async function deleteUser(userId, requesterId) {
         throw new Error('You cannot delete your own account');
     }
 
-    const check = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    const check = await pool.query('SELECT id FROM users WHERE id = $1::uuid', [userId]);
     if (check.rows.length === 0) {
         throw new Error('User not found');
     }
 
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1::uuid', [userId]);
     return { success: true, message: 'User deleted successfully' };
 }
 

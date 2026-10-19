@@ -4,6 +4,22 @@ Welcome to the **NP Nilsson** project! This repository contains an Android appli
 
 ---
 
+## ✨ Features
+
+### 📋 Report Management
+* **Create Reports**: Submit incident reports across multiple categories (*Damaged Goods*, *Safety*, *Maintenance*, *Other*).
+* **Camera & Media Capture**: Capture photos using the in-app camera or pick images from the device gallery.
+* **EXIF Metadata Preservation**: Automatically extracts and stores EXIF metadata (camera model, GPS location, timestamp) with uploaded photos.
+* **Status Workflow**: Filter, track, and update report statuses (*Open*, *In Progress*, *Resolved*).
+
+### 🛡️ Admin Management Module
+* **User Management**: Search, filter, create, edit, or delete user accounts and assign user roles (`USER` / `ADMIN`).
+* **Password Reset**: Directly reset user passwords from the admin panel.
+* **Store Branch Management**: Create and manage store branches and assign staff members to specific locations.
+* **Centralized Dashboard**: Dedicated Admin navigation tab for system-wide oversight.
+
+---
+
 ## 🚀 Getting Started (Step-by-Step from Git Clone)
 
 Follow these steps to clone and set up the project on your machine:
@@ -25,7 +41,7 @@ The easiest way to run the PostgreSQL database, pgAdmin, and the Node.js backend
 3. This automatically:
    - Starts PostgreSQL (`np_postgres`) on port `5432`.
    - Starts pgAdmin (`np_pgadmin`) on port `5050`.
-   - Builds and starts the Node.js Express backend (`np_backend`) on port `8080`, initializes database tables, and seeds an admin account.
+   - Builds and starts the Node.js Express backend (`np_backend`) on port `8080`, initializes database tables, and seeds default accounts and stores.
 
 To verify the backend is running, open your browser and visit:
 👉 **[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)** (should return `{"status":"UP"}`).
@@ -60,15 +76,21 @@ To verify the backend is running, open your browser and visit:
 
 ---
 
-## 🔑 Default Admin Credentials
+## 🔑 Default Seeded Credentials
 
-Log into the app using the seeded admin account:
-* **Email:** `admin@admin.com`
-* **Password:** `admin`
+Log into the app using the pre-seeded accounts:
+
+* **Admin Account:**
+  * **Email:** `admin@admin.com`
+  * **Password:** `admin`
+
+* **Test Employee Account:**
+  * **Email:** `test@test.com`
+  * **Password:** `test`
 
 ---
 
 ## 🛠️ Tech Stack
 * **Frontend:** Android (Kotlin, Jetpack Compose, Retrofit, Material 3)
-* **Backend:** Node.js, Express, PostgreSQL (`pg`), `bcryptjs`
+* **Backend:** Node.js, Express, PostgreSQL (`pg`), `bcryptjs`, Multer, Exifr
 * **Infrastructure:** Docker & Docker Compose

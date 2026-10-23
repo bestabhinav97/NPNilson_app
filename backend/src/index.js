@@ -3,73 +3,244 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { initDatabase } = require('./db/database');
+
 const authController = require('./controllers/authController');
 const adminController = require('./controllers/adminController');
 const reportController = require('./controllers/reportController');
+
 const authService = require('./services/authService');
-const { requireAuth, requireAdmin } = require('./middleware/authMiddleware');
+
+const {
+    requireAuth,
+    requireAdmin
+} = require('./middleware/authMiddleware');
 
 const app = express();
-const PORT = process.env.SERVER_PORT || process.env.PORT || 8080;
+
+const PORT =
+    process.env.SERVER_PORT ||
+    process.env.PORT ||
+    8080;
+
+// ---------------------------------------------------------
+// Middleware
+// ---------------------------------------------------------
 
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint (matches Spring Boot Actuator health)
-app.get('/actuator/health', (req, res) => {
-    res.json({ status: 'UP' });
-});
+// ---------------------------------------------------------
+// Health
+// ---------------------------------------------------------
 
-app.get('/', (req, res) => {
-    res.json({ message: 'NP Nilsson Node.js Backend is running' });
-});
-
-// Auth Routes
-app.post('/api/auth/login', authController.login);
-app.get('/api/auth/me', requireAuth, authController.getCurrentUser);
-app.post('/api/auth/logout', requireAuth, authController.logout);
-
-// Stores Route
-app.get('/api/stores', requireAuth, async (req, res) => {
-    try {
-        const stores = await authService.getAllStores();
-        res.json(stores);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+app.get(
+    '/actuator/health',
+    (req, res) => {
+        res.json({
+            status: 'UP'
+        });
     }
-});
+);
 
-// Report Routes
-app.post('/api/reports', requireAuth, reportController.uploadImages, reportController.createReport);
-app.get('/api/reports', requireAuth, reportController.getReports);
-app.patch('/api/reports/:reportId/status', requireAdmin, reportController.updateReportStatus);
-app.get('/api/reports/:reportId/images/:imageId', requireAuth, reportController.getReportImage);
+app.get(
+    '/',
+    (req, res) => {
+        res.json({
+            message:
+                'NP Nilsson Node.js Backend is running'
+        });
+    }
+);
 
-// Admin Routes
-app.get('/api/admin/users', requireAdmin, adminController.getAllUsers);
-app.post('/api/admin/users', requireAdmin, adminController.createUser);
-app.put('/api/admin/users/:userId', requireAdmin, adminController.updateUser);
-app.delete('/api/admin/users/:userId', requireAdmin, adminController.deleteUser);
-app.post('/api/admin/users/:userId/reset-password', requireAdmin, adminController.resetPassword);
+// ---------------------------------------------------------
+// Authentication routes
+// ---------------------------------------------------------
 
-app.post('/api/admin/stores', requireAdmin, adminController.createStore);
-app.put('/api/admin/stores/:storeId', requireAdmin, adminController.updateStore);
-app.delete('/api/admin/stores/:storeId', requireAdmin, adminController.deleteStore);
+app.post(
+    '/api/auth/login',
+    authController.login
+);
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ error: err.message || 'Internal server error' });
-});
+app.get(
+    '/api/auth/me',
+    requireAuth,
+    authController.getCurrentUser
+);
+
+app.post(
+    '/api/auth/logout',
+    requireAuth,
+    authController.logout
+);
+
+// ---------------------------------------------------------
+// Store routes
+// ---------------------------------------------------------
+
+app.get(
+    '/api/stores',
+    requireAuth,
+    async (req, res) => {
+        try {
+            const stores =
+                await authService.getAllStores();
+
+            return res.json(stores);
+        } catch (err) {
+            return res
+                .status(500)
+                .json({
+                    error: err.message
+                });
+        }
+    }
+);
+
+// ---------------------------------------------------------
+// Report routes
+// ---------------------------------------------------------
+
+app.post(
+    '/api/reports',
+    requireAuth,
+    reportController.uploadImages,
+    reportController.createReport
+);
+
+app.get(
+    '/api/reports',
+    requireAuth,
+    reportController.getReports
+);
+
+app.patch(
+    '/api/reports/:reportId/status',
+    requireAdmin,
+    reportController.updateReportStatus
+);
+
+app.get(
+    '/api/reports/:reportId/images/:imageId',
+    requireAuth,
+    reportController.getReportImage
+);
+
+// ---------------------------------------------------------
+// Admin dashboard
+// ---------------------------------------------------------
+
+app.get(
+    '/api/admin/dashboard',
+    requireAdmin,
+    adminController.getDashboard
+);
+
+// ---------------------------------------------------------
+// Admin user routes
+// ---------------------------------------------------------
+
+app.get(
+    '/api/admin/users',
+    requireAdmin,
+    adminController.getAllUsers
+);
+
+app.post(
+    '/api/admin/users',
+    requireAdmin,
+    adminController.createUser
+);
+
+app.put(
+    '/api/admin/users/:userId',
+    requireAdmin,
+    adminController.updateUser
+);
+
+app.patch(
+    '/api/admin/users/:userId/active',
+    requireAdmin,
+    adminController.setUserActive
+);
+
+app.delete(
+    '/api/admin/users/:userId',
+    requireAdmin,
+    adminController.deleteUser
+);
+
+app.post(
+    '/api/admin/users/:userId/reset-password',
+    requireAdmin,
+    adminController.resetPassword
+);
+
+// ---------------------------------------------------------
+// Admin store routes
+// ---------------------------------------------------------
+
+app.post(
+    '/api/admin/stores',
+    requireAdmin,
+    adminController.createStore
+);
+
+app.put(
+    '/api/admin/stores/:storeId',
+    requireAdmin,
+    adminController.updateStore
+);
+
+app.delete(
+    '/api/admin/stores/:storeId',
+    requireAdmin,
+    adminController.deleteStore
+);
+
+// ---------------------------------------------------------
+// Global error handler
+// ---------------------------------------------------------
+
+app.use(
+    (err, req, res, next) => {
+        console.error(
+            'Unhandled error:',
+            err
+        );
+
+        return res
+            .status(500)
+            .json({
+                error:
+                    err.message ||
+                    'Internal server error'
+            });
+    }
+);
+
+// ---------------------------------------------------------
+// Start server
+// ---------------------------------------------------------
 
 async function startServer() {
     await initDatabase();
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Backend server running on port ${PORT}`);
-    });
+
+    app.listen(
+        PORT,
+        '0.0.0.0',
+        () => {
+            console.log(
+                `Backend server running on port ${PORT}`
+            );
+        }
+    );
 }
 
 startServer().catch(err => {
-    console.error('Failed to start server:', err);
+    console.error(
+        'Failed to start server:',
+        err
+    );
+
     process.exit(1);
 });

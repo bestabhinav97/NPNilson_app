@@ -77,13 +77,13 @@ class ReportValidationTest {
     @Test
     fun labels_areSwedishAndFallBackToRawValue() {
         assertEquals("Skadat gods", ReportFormatting.categoryLabel("DAMAGED_GOODS"))
-        assertEquals("Åtgärdad", ReportFormatting.statusLabel("RESOLVED"))
+        assertEquals("Klar", ReportFormatting.statusLabel("RESOLVED"))
         assertEquals("UNKNOWN", ReportFormatting.categoryLabel("UNKNOWN"))
     }
 
     @Test
     fun statuses_matchBackendAndHaveSwedishLabels() {
         assertEquals(listOf("OPEN", "IN_PROGRESS", "RESOLVED"), ReportFormatting.STATUSES)
-        assertEquals(listOf("Öppen", "Pågår", "Åtgärdad"), ReportFormatting.STATUSES.map(ReportFormatting::statusLabel))
+        assertEquals(listOf("Ny", "Pågår", "Klar"), ReportFormatting.STATUSES.map(ReportFormatting::statusLabel))
     }
 }

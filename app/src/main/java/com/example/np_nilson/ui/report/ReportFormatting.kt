@@ -17,9 +17,9 @@ object ReportFormatting {
         ReportCategory.fromApiValue(apiValue)?.label ?: apiValue
 
     fun statusLabel(status: String): String = when (status) {
-        "OPEN" -> "Öppen"
+        "OPEN" -> "Ny"
         "IN_PROGRESS" -> "Pågår"
-        "RESOLVED" -> "Åtgärdad"
+        "RESOLVED" -> "Klar"
         else -> status
     }
 

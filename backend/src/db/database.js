@@ -319,6 +319,8 @@ async function initDatabase() {
         // Seed administrators
         // ---------------------------------------------------------
 
+        await require('./reportFeatures').migrateReportFeatures(client);
+
         const adminEmail1 =
             process.env.SEED_ADMIN_EMAIL ||
             'admin@npnilsson.se';

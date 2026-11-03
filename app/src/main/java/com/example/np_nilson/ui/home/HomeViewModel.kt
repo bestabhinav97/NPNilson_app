@@ -37,6 +37,23 @@ class HomeViewModel : ViewModel() {
     var adminDashboard by mutableStateOf<AdminDashboardDto?>(null)
         private set
 
+    var adminDashboardError by mutableStateOf<String?>(null)
+        private set
+
+    var reportCategories by mutableStateOf<List<com.example.np_nilson.data.api.CategoryDto>>(emptyList())
+        private set
+
+    fun loadCategories(sessionManager: SessionManager) {
+        val token = sessionManager.getToken() ?: return
+        viewModelScope.launch {
+            try {
+                val response = ApiClient.getReportsApi().getCategories("Bearer $token")
+                if (response.isSuccessful) reportCategories = response.body().orEmpty()
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { /* The create form offers a retry if categories cannot be loaded. */ }
+        }
+    }
+
     var isLoadingAdminDashboard by mutableStateOf(false)
         private set
 
@@ -202,6 +219,7 @@ class HomeViewModel : ViewModel() {
     fun refreshCurrentUser(
         sessionManager: SessionManager
     ) {
+        loadCategories(sessionManager)
         val token =
             sessionManager.getToken()
                 ?: return
@@ -264,6 +282,8 @@ class HomeViewModel : ViewModel() {
     fun loadAdminDashboard(
         sessionManager: SessionManager
     ) {
+        if (isLoadingAdminDashboard) return
+        adminDashboardError = null
         val token =
             sessionManager.getToken()
                 ?: return
@@ -286,9 +306,13 @@ class HomeViewModel : ViewModel() {
                 ) {
                     adminDashboard =
                         response.body()
+                } else {
+                    adminDashboardError = "Kunde inte hämta översikten (HTTP ${response.code()}). Försök igen."
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (_: Exception) {
-                // Dashboard remains on its last successfully loaded value.
+                adminDashboardError = "Kunde inte ansluta. Visar senast hämtade uppgifter om de finns."
             } finally {
                 isLoadingAdminDashboard =
                     false

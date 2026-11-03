@@ -21,13 +21,16 @@ function toIsoLocal(exifDateTime) {
     if (!match) return null;
     const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`;
     const date = new Date(`${iso}Z`);
-    if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1990) return null;
+    if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1990 || date.toISOString().slice(0,19) !== iso) return null;
     return iso;
 }
 
 function toOffset(value) {
     const offset = String(value || '').trim();
-    return /^[+-]\d{2}:\d{2}$/.test(offset) ? offset : null;
+    if (!/^[+-]\d{2}:\d{2}$/.test(offset)) return null;
+    const hours = Number(offset.slice(1,3));
+    const minutes = Number(offset.slice(4,6));
+    return hours <= 14 && minutes < 60 && (hours < 14 || minutes === 0) ? offset : null;
 }
 
 function toNumber(value) {
@@ -76,7 +79,7 @@ async function readPhotoMetadata(filePath) {
 
     const latitude = toNumber(exif.latitude);
     const longitude = toNumber(exif.longitude);
-    const hasPosition = latitude !== null && longitude !== null && !(latitude === 0 && longitude === 0);
+    const hasPosition = latitude !== null && longitude !== null && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 
     return {
         takenAtLocal: toIsoLocal(exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate),

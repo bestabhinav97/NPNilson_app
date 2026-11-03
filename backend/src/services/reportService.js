@@ -5,7 +5,7 @@ const path = require('path');
 const { PHOTO_TIME_ZONE, readPhotoMetadata } = require('./photoMetadata');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads');
-const CATEGORIES = ['DAMAGED_GOODS', 'SAFETY', 'MAINTENANCE', 'OTHER'];
+const categoryService = require('./categoryService');
 const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
 const MAX_TITLE_LENGTH = 150;
 
@@ -15,6 +15,9 @@ function formatReportResponse(row, images) {
     return {
         id: row.id,
         category: row.category,
+        categoryName: row.category_name || row.category,
+        categoryIcon: row.category_icon || 'OTHER',
+        fields: row.fields || [],
         title: row.title,
         description: row.description,
         status: row.status,
@@ -43,41 +46,49 @@ function formatReportResponse(row, images) {
     };
 }
 
-function removeFiles(files) {
-    for (const file of files || []) {
-        fs.unlink(file.path, () => {});
-    }
+async function removeFiles(files) {
+    await Promise.all((files || []).map(file => fs.promises.unlink(file.path).catch(() => {})));
 }
 
 async function createReport(user, data, files) {
     const { category, title, description = '' } = data;
 
     try {
-        if (!CATEGORIES.includes(category)) {
-            throw new Error(`Category must be one of: ${CATEGORIES.join(', ')}`);
-        }
-        if (!title || !title.trim()) {
+        if (typeof category !== 'string') throw new Error('Välj en kategori');
+        if (typeof title !== 'string' || !title.trim()) {
             throw new Error('Title is required');
         }
         if (title.trim().length > MAX_TITLE_LENGTH) {
             throw new Error(`Title must be at most ${MAX_TITLE_LENGTH} characters`);
         }
+        if (typeof description !== 'string') throw new Error('Beskrivningen måste vara text');
     } catch (err) {
-        removeFiles(files);
+        await removeFiles(files);
         throw err;
     }
 
     const reportId = uuidv4();
     const storeId = user.store ? user.store.storeId : null;
     const metadata = await Promise.all((files || []).map(file => readPhotoMetadata(file.path)));
-    const client = await pool.connect();
+    let client;
 
     try {
+        client = await pool.connect();
         await client.query('BEGIN');
+        const categoryRow = await client.query('SELECT id FROM report_categories WHERE code=$1 AND is_active=TRUE FOR SHARE', [category]);
+        if (!categoryRow.rows.length) throw new Error('Kategorin är inte tillgänglig. Uppdatera formuläret.');
+        const selectedCategory = (await categoryService.listCategories(false, client)).find(c => c.code === category);
+        let values;
+        try { values = JSON.parse(data.fieldValues || '{}'); } catch (_) { throw new Error('Ogiltiga fältvärden'); }
+        const fields = categoryService.validateValues(selectedCategory.fields, values);
         await client.query(
-            'INSERT INTO reports (id, user_id, store_id, category, title, description) VALUES ($1, $2, $3, $4, $5, $6)',
-            [reportId, user.id, storeId, category, title.trim(), description.trim()]
+            'INSERT INTO reports (id, user_id, store_id, category, title, description,category_id,category_name,category_icon) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+            [reportId, user.id, storeId, category, title.trim(), description.trim(),selectedCategory.id,selectedCategory.name,selectedCategory.icon]
         );
+        for (const field of fields) {
+            await client.query('INSERT INTO report_field_values(report_id,field_id,definition,value) VALUES($1,$2,$3,$4)',
+                [reportId,field.definition.id,JSON.stringify(field.definition),JSON.stringify(field.value)]);
+        }
 
         for (const [index, file] of (files || []).entries()) {
             const meta = metadata[index];
@@ -85,10 +96,10 @@ async function createReport(user, data, files) {
             await client.query(
                 `INSERT INTO report_images
                     (id, report_id, file_name, content_type, size_bytes,
-                     taken_at, latitude, longitude, altitude, camera_make, camera_model, exif)
+                     taken_at, latitude, longitude, altitude, camera_make, camera_model, exif, metadata_processed)
                  VALUES ($1, $2, $3, $4, $5,
                      COALESCE(($6::text || $7::text)::timestamptz, $6::timestamp AT TIME ZONE $8::text),
-                     $9, $10, $11, $12, $13, $14)`,
+                     $9, $10, $11, $12, $13, $14, TRUE)`,
                 [
                     path.parse(file.filename).name, reportId, file.filename, file.mimetype, file.size,
                     meta.takenAtLocal, meta.takenAtOffset, PHOTO_TIME_ZONE,
@@ -100,11 +111,11 @@ async function createReport(user, data, files) {
 
         await client.query('COMMIT');
     } catch (err) {
-        await client.query('ROLLBACK');
-        removeFiles(files);
+        if (client) await client.query('ROLLBACK').catch(() => {});
+        await removeFiles(files);
         throw err;
     } finally {
-        client.release();
+        if (client) client.release();
     }
 
     return getReportById(reportId);
@@ -112,7 +123,9 @@ async function createReport(user, data, files) {
 
 async function getReportById(reportId) {
     const result = await pool.query(
-        `SELECT r.*, u.firstname, u.lastname, s.store_name
+        `SELECT r.*, u.firstname, u.lastname, s.store_name,
+         COALESCE((SELECT jsonb_agg(jsonb_build_object('definition',v.definition,'value',v.value) ORDER BY (v.definition->>'sortOrder')::int,v.field_id)
+             FROM report_field_values v WHERE v.report_id=r.id),'[]') AS fields
          FROM reports r
          JOIN users u ON r.user_id = u.id
          LEFT JOIN stores s ON r.store_id = s.store_id
@@ -131,7 +144,9 @@ async function getReportById(reportId) {
 async function getReportsForUser(user) {
     const isAdmin = user.role === 'ADMIN';
     const result = await pool.query(
-        `SELECT r.*, u.firstname, u.lastname, s.store_name
+        `SELECT r.*, u.firstname, u.lastname, s.store_name,
+         COALESCE((SELECT jsonb_agg(jsonb_build_object('definition',v.definition,'value',v.value) ORDER BY (v.definition->>'sortOrder')::int,v.field_id)
+             FROM report_field_values v WHERE v.report_id=r.id),'[]') AS fields
          FROM reports r
          JOIN users u ON r.user_id = u.id
          LEFT JOIN stores s ON r.store_id = s.store_id
@@ -142,7 +157,7 @@ async function getReportsForUser(user) {
     if (result.rows.length === 0) return [];
 
     const images = await pool.query(
-        'SELECT * FROM report_images WHERE report_id = ANY($1) ORDER BY created_at ASC',
+        'SELECT * FROM report_images WHERE report_id = ANY($1::uuid[]) ORDER BY created_at ASC',
         [result.rows.map(r => r.id)]
     );
     return result.rows.map(row =>
@@ -187,5 +202,6 @@ module.exports = {
     createReport,
     getReportsForUser,
     updateReportStatus,
-    getReportImage
+    getReportImage,
+    getReportById
 };

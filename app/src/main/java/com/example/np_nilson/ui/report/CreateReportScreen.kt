@@ -48,12 +48,12 @@ import kotlinx.coroutines.withContext
 @Composable
 fun CreateReportScreen(
     sessionManager: SessionManager,
-    initialCategory: ReportCategory?,
+    initialCategory: String?,
     onClose: () -> Unit,
     viewModel: CreateReportViewModel = viewModel()
 ) {
     LaunchedEffect(Unit) {
-        viewModel.start(initialCategory)
+        viewModel.start(initialCategory, sessionManager)
     }
 
     val close = {
@@ -126,25 +126,20 @@ fun CreateReportScreen(
             Column {
                 SectionTitle("Kategori")
                 Spacer(modifier = Modifier.height(8.dp))
-                ReportCategory.entries.chunked(2).forEach { rowCategories ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        rowCategories.forEach { category ->
-                            FilterChip(
-                                selected = viewModel.category == category,
-                                onClick = { viewModel.category = category },
-                                label = { Text(category.label) },
-                                enabled = !viewModel.isSubmitting,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = NpBluePrimary,
-                                    selectedLabelColor = Color.White
-                                ),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                if (viewModel.isLoadingCategories) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                ChoiceMenu("Kategori", viewModel.category?.code.orEmpty(),
+                    viewModel.categories.map { it.code to it.name }, !viewModel.isSubmitting) { code ->
+                    viewModel.categories.find { it.code == code }?.let(viewModel::selectCategory)
+                }
+                viewModel.category?.description?.takeIf { it.isNotBlank() }?.let { Text(it, color = NpTextSecondary) }
+                TextButton(enabled = !viewModel.isLoadingCategories && !viewModel.isSubmitting,
+                    onClick = { viewModel.loadCategories(sessionManager, initialCategory) }) {
+                    Text(if (viewModel.categories.isEmpty()) "Försök igen" else "Uppdatera kategorier")
+                }
+            }
+            viewModel.category?.let { selected ->
+                DynamicFields(selected.fields, viewModel.fieldValues, !viewModel.isSubmitting) { id, value ->
+                    viewModel.fieldValues[id] = value
                 }
             }
 

@@ -66,7 +66,7 @@ private const val RECENT_REPORTS_COUNT = 3
 fun HomeScreen(
     sessionManager: SessionManager,
     onLoggedOut: () -> Unit,
-    onCreateReport: (ReportCategory?) -> Unit,
+    onCreateReport: (String?) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     LaunchedEffect(Unit) {
@@ -273,6 +273,7 @@ fun HomeScreen(
         ReportDetailDialog(
             report = report,
             token = sessionManager.getToken(),
+            currentUserId = user?.id,
             canChangeStatus = user?.role == "ADMIN",
             isUpdatingStatus = viewModel.isUpdatingReportStatus,
             statusError = viewModel.reportStatusError,
@@ -343,7 +344,7 @@ fun HomeTabContent(
     user: UserDto?,
     viewModel: HomeViewModel,
     token: String?,
-    onCreateReport: (ReportCategory?) -> Unit,
+    onCreateReport: (String?) -> Unit,
     onShowAllReports: () -> Unit,
     onActionClicked: (String) -> Unit
 ) {
@@ -408,47 +409,14 @@ fun HomeTabContent(
             )
         }
 
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ReportCategoryCard(
-                        title = "Skadad vara",
-                        subtitle = "Rapportera skadat gods",
-                        icon = Icons.Outlined.Warning,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onCreateReport(ReportCategory.DAMAGED_GOODS) }
-                    )
-                    ReportCategoryCard(
-                        title = "Säkerhet",
-                        subtitle = "Tillbud & risksituationer",
-                        icon = Icons.Default.Security,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onCreateReport(ReportCategory.SAFETY) }
-                    )
+        items(viewModel.reportCategories.chunked(2)) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { category ->
+                    ReportCategoryCard(title = category.name, subtitle = category.description.ifBlank { "Skapa rapport" },
+                        icon = com.example.np_nilson.ui.report.categoryIcon(category.icon), modifier = Modifier.weight(1f),
+                        onClick = { onCreateReport(category.code) })
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ReportCategoryCard(
-                        title = "Underhåll",
-                        subtitle = "Fastighet & utrustning",
-                        icon = Icons.Outlined.Build,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onCreateReport(ReportCategory.MAINTENANCE) }
-                    )
-                    ReportCategoryCard(
-                        title = "Övrigt",
-                        subtitle = "Allmänna avvikelser",
-                        icon = Icons.Default.MoreHoriz,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onCreateReport(ReportCategory.OTHER) }
-                    )
-                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
 
@@ -870,7 +838,7 @@ private fun ReportFilterChip(
                 color = if (selected) Color.White else NpTextPrimary
             )
             Text(
-                text = count.toString(),
+                text = count?.toString() ?: "–",
                 fontSize = 11.sp,
                 color = if (selected)
                     Color.White.copy(alpha = 0.85f)
@@ -1063,6 +1031,14 @@ fun AdminTabContent(
             }
         }
 
+        item {
+            if (viewModel.isLoadingAdminDashboard) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            viewModel.adminDashboardError?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { viewModel.loadAdminDashboard(sessionManager) }) { Text("Försök igen") }
+            }
+        }
+
         viewModel.statusMessage?.let { message ->
             item {
                 Card(
@@ -1162,9 +1138,9 @@ fun AdminTabContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        AdminReportStat("Ny", dashboard?.openReports ?: 0)
-                        AdminReportStat("Pågår", dashboard?.inProgressReports ?: 0)
-                        AdminReportStat("Klar", dashboard?.resolvedReports ?: 0)
+                        AdminReportStat("Ny", dashboard?.openReports)
+                        AdminReportStat("Pågår", dashboard?.inProgressReports)
+                        AdminReportStat("Klar", dashboard?.resolvedReports)
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1193,7 +1169,7 @@ fun AdminTabContent(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("Användare", "Butiker", "Aktivitet").forEachIndexed { index, label ->
+                listOf("Användare", "Butiker", "Aktivitet", "Kategorier").forEachIndexed { index, label ->
                     Surface(
                         onClick = { section = index },
                         modifier = Modifier.weight(1f),
@@ -1676,6 +1652,13 @@ fun AdminTabContent(
             }
         }
 
+        if (section == 3) {
+            item {
+                com.example.np_nilson.ui.report.CategoryManagement(sessionManager,
+                    onChanged = { viewModel.loadCategories(sessionManager) })
+            }
+        }
+
         item {
             OutlinedButton(
                 onClick = {
@@ -1739,7 +1722,7 @@ private fun AdminMetricCard(
 @Composable
 private fun AdminReportStat(
     label: String,
-    count: Int
+    count: Int?
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(

@@ -16,6 +16,7 @@ const {
 } = require('./middleware/authMiddleware');
 
 const app = express();
+const features = require('./controllers/reportFeaturesController');
 
 const PORT =
     process.env.SERVER_PORT ||
@@ -28,6 +29,12 @@ const PORT =
 
 app.use(cors());
 app.use(express.json());
+app.get('/api/categories', requireAuth, features.listCategories);
+app.post('/api/admin/categories', requireAdmin, features.saveCategory);
+app.put('/api/admin/categories/:categoryId', requireAdmin, features.saveCategory);
+app.get('/api/reports/:reportId', requireAuth, features.getReport);
+app.get('/api/reports/:reportId/messages', requireAuth, features.getMessages);
+app.post('/api/reports/:reportId/messages', requireAuth, features.sendMessage);
 
 // ---------------------------------------------------------
 // Health
@@ -209,7 +216,7 @@ app.use(
         );
 
         return res
-            .status(500)
+            .status(err.status >= 400 && err.status <= 599 ? err.status : 500)
             .json({
                 error:
                     err.message ||
@@ -224,6 +231,8 @@ app.use(
 
 async function startServer() {
     await initDatabase();
+    const processed = await require('./services/backfillPhotoMetadata').backfillPhotoMetadata();
+    if (processed) console.log(`Read metadata from ${processed} existing report photos.`);
 
     app.listen(
         PORT,
@@ -236,7 +245,7 @@ async function startServer() {
     );
 }
 
-startServer().catch(err => {
+if (require.main === module) startServer().catch(err => {
     console.error(
         'Failed to start server:',
         err
@@ -244,3 +253,5 @@ startServer().catch(err => {
 
     process.exit(1);
 });
+
+module.exports = { app, startServer };

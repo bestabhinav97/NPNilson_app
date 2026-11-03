@@ -94,3 +94,27 @@ Log into the app using the pre-seeded accounts:
 * **Frontend:** Android (Kotlin, Jetpack Compose, Retrofit, Material 3)
 * **Backend:** Node.js, Express, PostgreSQL (`pg`), `bcryptjs`, Multer, Exifr
 * **Infrastructure:** Docker & Docker Compose
+
+## Configurable reports and conversations
+
+Rebuild the backend after updating this branch so the running API and database match the app:
+
+```powershell
+docker compose up --build -d backend
+```
+
+Startup applies repeatable migrations without deleting reports. The four original categories are seeded into `report_categories`; admins can add, edit, reorder, or archive categories under **Administration → Kategorier**. Category fields support text, multiline text, numbers, dates, dropdowns, and checkboxes, including required fields and numeric/text limits. Removing a used field archives its definition. Existing reports retain snapshots of category labels, field definitions, and answers.
+
+Report details show photo capture time, camera, and GPS when present, with fullscreen viewing and a map action. Existing uploaded files are inspected once for recoverable EXIF metadata; metadata absent from the file cannot be reconstructed. Missing files are retried at the next startup.
+
+Each report has a text conversation accessible only to its submitter and admins. The app refreshes while the report is visible, supports older-message pagination, and reuses a message UUID when retrying a failed send to avoid duplicate messages. Attachments, read receipts, and push notifications are not included.
+
+### Verification
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+docker compose exec backend npm test
+docker compose exec backend npm audit --omit=dev
+```
+
+Backend integration tests use a temporary PostgreSQL schema and upload directory and remove both afterward. Tests require schema creation permission in the configured database; the Compose database user has it. Coverage includes migration preservation, dynamic-field validation, archived definitions, photo metadata and backfill, dashboard counts, message authorization, idempotent sends, and pagination.

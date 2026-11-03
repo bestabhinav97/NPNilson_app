@@ -12,7 +12,7 @@ class ReportValidationTest {
 
     @Test
     fun validReport_hasNoError() {
-        assertNull(ReportValidation.validate(ReportCategory.SAFETY, "Halt golv vid entrén", photoCount = 2))
+        assertNull(ReportValidation.validate("SAFETY", "Halt golv vid entrén", photoCount = 2))
     }
 
     @Test
@@ -22,18 +22,18 @@ class ReportValidationTest {
 
     @Test
     fun blankTitle_isRejected() {
-        assertEquals("Ange en rubrik", ReportValidation.validate(ReportCategory.OTHER, "   ", photoCount = 0))
+        assertEquals("Ange en rubrik", ReportValidation.validate("OTHER", "   ", photoCount = 0))
     }
 
     @Test
     fun tooLongTitle_isRejected() {
         val title = "a".repeat(ReportValidation.MAX_TITLE_LENGTH + 1)
-        assertNotNull(ReportValidation.validate(ReportCategory.OTHER, title, photoCount = 0))
+        assertNotNull(ReportValidation.validate("OTHER", title, photoCount = 0))
     }
 
     @Test
     fun tooManyPhotos_isRejected() {
-        val error = ReportValidation.validate(ReportCategory.MAINTENANCE, "Trasig lampa", ReportValidation.MAX_PHOTOS + 1)
+        val error = ReportValidation.validate("MAINTENANCE", "Trasig lampa", ReportValidation.MAX_PHOTOS + 1)
         assertNotNull(error)
     }
 
@@ -77,13 +77,13 @@ class ReportValidationTest {
     @Test
     fun labels_areSwedishAndFallBackToRawValue() {
         assertEquals("Skadat gods", ReportFormatting.categoryLabel("DAMAGED_GOODS"))
-        assertEquals("Åtgärdad", ReportFormatting.statusLabel("RESOLVED"))
+        assertEquals("Klar", ReportFormatting.statusLabel("RESOLVED"))
         assertEquals("UNKNOWN", ReportFormatting.categoryLabel("UNKNOWN"))
     }
 
     @Test
     fun statuses_matchBackendAndHaveSwedishLabels() {
         assertEquals(listOf("OPEN", "IN_PROGRESS", "RESOLVED"), ReportFormatting.STATUSES)
-        assertEquals(listOf("Öppen", "Pågår", "Åtgärdad"), ReportFormatting.STATUSES.map(ReportFormatting::statusLabel))
+        assertEquals(listOf("Ny", "Pågår", "Klar"), ReportFormatting.STATUSES.map(ReportFormatting::statusLabel))
     }
 }

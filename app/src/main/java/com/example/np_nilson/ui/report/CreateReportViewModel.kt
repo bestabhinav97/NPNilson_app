@@ -13,6 +13,9 @@ import com.example.np_nilson.data.api.ApiClient
 import com.example.np_nilson.data.api.ErrorResponse
 import com.example.np_nilson.data.api.ReportCategory
 import com.example.np_nilson.data.api.ReportDto
+import com.example.np_nilson.data.api.CategoryDto
+import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.CancellationException
 import com.example.np_nilson.data.report.ReportImageLoader
 import com.example.np_nilson.data.session.SessionManager
 import com.google.gson.Gson
@@ -30,7 +33,7 @@ object ReportValidation {
     const val MAX_PHOTOS = 5
 
     /** Returns an error message to show, or null if the report can be sent. */
-    fun validate(category: ReportCategory?, title: String, photoCount: Int): String? = when {
+    fun validate(category: String?, title: String, photoCount: Int): String? = when {
         category == null -> "Välj en kategori"
         title.isBlank() -> "Ange en rubrik"
         title.trim().length > MAX_TITLE_LENGTH -> "Rubriken får vara högst $MAX_TITLE_LENGTH tecken"
@@ -41,7 +44,43 @@ object ReportValidation {
 
 class CreateReportViewModel(application: Application) : AndroidViewModel(application) {
 
-    var category by mutableStateOf<ReportCategory?>(null)
+    var category by mutableStateOf<CategoryDto?>(null)
+        private set
+    var categories by mutableStateOf<List<CategoryDto>>(emptyList())
+        private set
+    var isLoadingCategories by mutableStateOf(false)
+        private set
+    private var categoriesJob: kotlinx.coroutines.Job? = null
+    private var categoriesGeneration = 0
+    val fieldValues = mutableStateMapOf<String, String>()
+
+    fun selectCategory(value: CategoryDto) {
+        category = value
+        fieldValues.clear()
+        value.fields.filter { it.type == "CHECKBOX" }.forEach { fieldValues[it.id] = "false" }
+    }
+
+    fun loadCategories(sessionManager: SessionManager, initialCode: String?) {
+        val token = sessionManager.getToken() ?: return
+        if (isLoadingCategories) return
+        isLoadingCategories = true
+        val generation = ++categoriesGeneration
+        categoriesJob = viewModelScope.launch {
+            try {
+                val response = ApiClient.getReportsApi().getCategories("Bearer $token")
+                if (generation != categoriesGeneration) return@launch
+                if (!response.isSuccessful) throw IllegalStateException("Kunde inte hämta kategorier (HTTP ${response.code()})")
+                categories = response.body().orEmpty()
+                if (category == null) categories.find { it.code == initialCode }?.let(::selectCategory)
+                else categories.find { it.id == category?.id }?.let { category = it }
+                    ?: run { category = null; fieldValues.clear() }
+                category?.fields?.filter { it.type == "CHECKBOX" }?.forEach { fieldValues.putIfAbsent(it.id,"false") }
+                errorMessage = if (categories.isEmpty()) "Inga aktiva kategorier. Kontakta administratören." else null
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { errorMessage = e.message ?: "Kunde inte hämta kategorier" }
+            finally { if (generation == categoriesGeneration) isLoadingCategories = false }
+        }
+    }
     var title by mutableStateOf("")
     var description by mutableStateOf("")
     val photos = mutableStateListOf<Uri>()
@@ -61,15 +100,20 @@ class CreateReportViewModel(application: Application) : AndroidViewModel(applica
     private var started = false
 
     // The ViewModel outlives the screen, so the form is only set up once per visit
-    fun start(initialCategory: ReportCategory?) {
+    fun start(initialCategory: String?, sessionManager: SessionManager) {
         if (started) return
         started = true
-        category = initialCategory
+        loadCategories(sessionManager, initialCategory)
     }
 
     fun clear() {
+        categoriesGeneration++
+        categoriesJob?.cancel()
+        isLoadingCategories = false
         started = false
         category = null
+        categories = emptyList()
+        fieldValues.clear()
         title = ""
         description = ""
         photos.clear()
@@ -98,20 +142,27 @@ class CreateReportViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun submit(sessionManager: SessionManager) {
+        if (isSubmitting) return
         val token = sessionManager.getToken() ?: return
         val selectedCategory = category
-        val validationError = ReportValidation.validate(selectedCategory, title, photos.size)
+        val validationError = ReportValidation.validate(selectedCategory?.code, title, photos.size)
         if (validationError != null || selectedCategory == null) {
             errorMessage = validationError
             return
         }
+
+        val values = try { DynamicFieldValidation.values(selectedCategory.fields, fieldValues) }
+        catch (e: IllegalArgumentException) { errorMessage = e.message; return }
+        val uploadPhotos = photos.toList()
+        val uploadTitle = title.trim()
+        val uploadDescription = description.trim()
 
         errorMessage = null
         isSubmitting = true
         viewModelScope.launch {
             val imageParts = try {
                 withContext(Dispatchers.IO) {
-                    photos.mapIndexed { index, uri ->
+                    uploadPhotos.mapIndexed { index, uri ->
                         val bytes = ReportImageLoader.compressForUpload(getApplication(), uri)
                         MultipartBody.Part.createFormData(
                             "images",
@@ -120,6 +171,7 @@ class CreateReportViewModel(application: Application) : AndroidViewModel(applica
                         )
                     }
                 }
+            } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 isSubmitting = false
                 errorMessage = "Kunde inte läsa en av bilderna. Ta bort den och försök igen."
@@ -129,9 +181,10 @@ class CreateReportViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val response = ApiClient.getReportsApi().createReport(
                     authHeader = "Bearer $token",
-                    category = selectedCategory.apiValue.toRequestBody(TEXT),
-                    title = title.trim().toRequestBody(TEXT),
-                    description = description.trim().toRequestBody(TEXT),
+                    category = selectedCategory.code.toRequestBody(TEXT),
+                    title = uploadTitle.toRequestBody(TEXT),
+                    description = uploadDescription.toRequestBody(TEXT),
+                    fieldValues = Gson().toJson(values).toRequestBody(TEXT),
                     images = imageParts
                 )
                 isSubmitting = false
@@ -142,9 +195,12 @@ class CreateReportViewModel(application: Application) : AndroidViewModel(applica
                     val parsed = try { Gson().fromJson(errorStr, ErrorResponse::class.java)?.error } catch (e: Exception) { null }
                     errorMessage = parsed ?: "Kunde inte skicka rapporten"
                 }
+            } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 isSubmitting = false
                 errorMessage = "Kunde inte ansluta till servern"
+            } finally {
+                isSubmitting = false
             }
         }
     }

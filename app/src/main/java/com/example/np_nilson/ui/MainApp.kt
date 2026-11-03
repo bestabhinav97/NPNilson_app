@@ -21,7 +21,7 @@ fun MainApp() {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     var currentScreen by remember { mutableStateOf(ScreenState.SPLASH) }
-    var reportCategory by remember { mutableStateOf<ReportCategory?>(null) }
+    var reportCategory by remember { mutableStateOf<String?>(null) }
 
     when (currentScreen) {
         ScreenState.SPLASH -> {

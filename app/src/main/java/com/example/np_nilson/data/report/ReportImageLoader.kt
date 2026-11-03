@@ -49,14 +49,15 @@ object ReportImageLoader {
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 
-    /** Re-encodes the photo as a downscaled JPEG so uploads stay small. */
+    /** Re-encodes the photo as a downscaled JPEG so uploads stay small, keeping its EXIF metadata. */
     fun compressForUpload(context: Context, uri: Uri): ByteArray {
         val bitmap = loadBitmap(context, uri, UPLOAD_MAX_DIMENSION)
-        return ByteArrayOutputStream().use { out ->
+        val jpeg = ByteArrayOutputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, UPLOAD_JPEG_QUALITY, out)
             bitmap.recycle()
             out.toByteArray()
         }
+        return PhotoMetadata.copyExif(context, uri, jpeg)
     }
 
     /** Largest power-of-two subsampling that keeps the longest side at or above [maxDimension]. */

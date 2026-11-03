@@ -39,6 +39,11 @@ services:
     container_name: np_backend
     restart: always
     environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-np_nilson}
+      POSTGRES_USER: ${POSTGRES_USER:-np_db_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-np_db_password}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-np_nilson}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-np_db_user}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-np_db_password}
@@ -57,7 +62,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

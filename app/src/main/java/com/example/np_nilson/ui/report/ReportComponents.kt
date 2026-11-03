@@ -136,7 +136,7 @@ fun ReportListItem(
                         .background(Color(0xFFE8F2FC)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(categoryIcon(report.category), contentDescription = null, tint = NpBluePrimary)
+                    Icon(categoryIcon(report.categoryIcon ?: report.category), contentDescription = null, tint = NpBluePrimary)
                 }
             }
 
@@ -158,7 +158,7 @@ fun ReportListItem(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${ReportFormatting.categoryLabel(report.category)} · ${ReportFormatting.formatDate(report.createdAt)}",
+                    text = "${(report.categoryName ?: ReportFormatting.categoryLabel(report.category))} · ${ReportFormatting.formatDate(report.createdAt)}",
                     fontSize = 12.sp,
                     color = NpTextSecondary
                 )
@@ -183,12 +183,14 @@ fun ReportListItem(
 fun ReportDetailDialog(
     report: ReportDto,
     token: String?,
+    currentUserId: String?,
     canChangeStatus: Boolean,
     isUpdatingStatus: Boolean,
     statusError: String?,
     onChangeStatus: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var expandedImage by remember(report.id) { mutableStateOf<com.example.np_nilson.data.api.ReportImageDto?>(null) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
@@ -196,7 +198,7 @@ fun ReportDetailDialog(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Rapport", fontWeight = FontWeight.Bold) },
+                    title = { Column { Text("Rapport", fontWeight = FontWeight.Bold); Text("#${report.id.take(8).uppercase()}", style = MaterialTheme.typography.labelMedium) } },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Tillbaka")
@@ -223,11 +225,11 @@ fun ReportDetailDialog(
                             .background(Color(0xFFE8F2FC)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(categoryIcon(report.category), contentDescription = null, tint = NpBluePrimary)
+                        Icon(categoryIcon(report.categoryIcon ?: report.category), contentDescription = null, tint = NpBluePrimary)
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = ReportFormatting.categoryLabel(report.category),
+                        text = (report.categoryName ?: ReportFormatting.categoryLabel(report.category)),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NpBluePrimary,
@@ -255,11 +257,27 @@ fun ReportDetailDialog(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        DetailRow("Skapad", ReportFormatting.formatDate(report.createdAt))
+                        DetailRow("Referens", report.id)
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        DetailRow("Inskickad", ReportFormatting.formatDate(report.createdAt))
                         HorizontalDivider(color = Color(0xFFF1F5F9))
                         DetailRow("Rapporterad av", "${report.author.firstname} ${report.author.lastname}")
                         HorizontalDivider(color = Color(0xFFF1F5F9))
                         DetailRow("Butik", report.storeName ?: "Ingen butik")
+                    }
+                }
+
+                if (report.fields.isNotEmpty()) {
+                    OutlinedCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Kategoriuppgifter", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            report.fields.forEach { field ->
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(field.definition.label, style = MaterialTheme.typography.labelLarge, color = NpTextSecondary)
+                                    Text(if (field.value.isJsonNull) "Ej angivet" else if (field.definition.type == "CHECKBOX") { if (field.value.asBoolean) "Ja" else "Nej" } else field.value.asString)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -297,12 +315,30 @@ fun ReportDetailDialog(
                                 .fillMaxWidth()
                                 .aspectRatio(4f / 3f)
                                 .clip(RoundedCornerShape(12.dp))
+                                .clickable { expandedImage = image }
                         )
+                        TextButton(onClick = { expandedImage = image }) { Text("Visa i helskärm") }
+                        PhotoInformation(image)
+                        HorizontalDivider()
                     }
+                }
+                ReportConversation(report.id, token, currentUserId)
+            }
+        }
+    }
+    expandedImage?.let { image ->
+        Dialog(onDismissRequest = { expandedImage = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Scaffold(topBar = { TopAppBar(title = { Text("Rapportbild") }, navigationIcon = {
+                IconButton(onClick = { expandedImage = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Stäng bild") }
+            }) }) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+                    ReportImage(image.url, token, 2400, Modifier.weight(1f).fillMaxWidth(), ContentScale.Fit)
+                    PhotoInformation(image)
                 }
             }
         }
     }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -355,12 +391,11 @@ private fun StatusSelector(
 
 @Composable
 private fun DetailRow(label: String, value: String) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(label, fontWeight = FontWeight.Medium, color = NpTextSecondary)
-        Spacer(modifier = Modifier.width(12.dp))
         Text(value, fontWeight = FontWeight.Bold, color = NpTextPrimary)
     }
 }

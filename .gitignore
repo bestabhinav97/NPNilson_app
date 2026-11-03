@@ -23,3 +23,5 @@ backend/.kotlin/
 local.properties
 .env
 uploads/
+.artifacts/
+.idea/
